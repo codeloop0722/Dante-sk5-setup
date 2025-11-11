@@ -103,7 +103,8 @@ fi
 
 # 获取公网出口 IP
 PUBLIC_IP=$(timeout 5 curl -s https://api.ipify.org 2>/dev/null || echo "获取失败")
-
+#检测danted服务的状态 active 则为启动成功
+systemctl status danted.service
 # 最终提示
 echo ""
 echo "✅ Dante SOCKS5 代理已成功启动！"
