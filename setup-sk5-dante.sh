@@ -2,7 +2,7 @@
 
 # ==================================================
 # Dante SOCKS5 Proxy 非交互式安装脚本 (Ubuntu/Debian)
-# 作者: Codeloop
+# 作者: Assistant
 # 功能: 自动安装 dante-server，创建用户，配置监听 0.0.0.0:1080
 # 使用: curl -fsSL <url> | sudo bash
 # ==================================================
@@ -50,29 +50,26 @@ cp /etc/danted.conf /etc/danted.conf.bak
 cat > /etc/danted.conf <<EOF
 logoutput: syslog
 user.privileged: root
-user.notprivileged: nobody
+user.unprivileged: nobody
 
-# 监听所有 IPv4 地址
-internal: 0.0.0.0 port=$PORT
+# The listening network interface or address.
+internal: 0.0.0.0 port=1080
 
-# 允许客户端来自任意 IP
+# The proxying network interface or address.
+external: eth0
+
+# socks-rules determine what is proxied through the external interface.
+socksmethod: username
+
+# client-rules determine who can connect to the internal interface.
+clientmethod: none
+
 client pass {
     from: 0.0.0.0/0 to: 0.0.0.0/0
-    log: connect disconnect error
 }
 
-# 允许 SOCKS5 认证用户访问任意目标
 socks pass {
     from: 0.0.0.0/0 to: 0.0.0.0/0
-    command: bind connect udpassociate
-    log: connect disconnect error
-}
-
-# 强制使用用户名/密码认证
-socks pass {
-    from: 0.0.0.0/0 to: 0.0.0.0/0
-    command: bindreply udpreply
-    log: connect error
 }
 EOF
 
