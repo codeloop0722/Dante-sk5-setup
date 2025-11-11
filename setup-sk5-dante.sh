@@ -1,97 +1,106 @@
 #!/bin/bash
 
-# Dante SOCKS5 Proxy Setup Script for Ubuntu 20.04+
-# Based on: https://www.digitalocean.com/community/tutorials/how-to-set-up-dante-proxy-on-ubuntu-20-04
+# ==================================================
+# Dante SOCKS5 Proxy 非交互式安装脚本 (Ubuntu/Debian)
+# 作者: Codeloop
+# 功能: 自动安装 dante-server，创建用户，配置监听 0.0.0.0:1080
+# 使用: curl -fsSL <url> | sudo bash
+# ==================================================
 
-set -e  # Exit on any error
+set -e  # 遇错退出
 
-echo "=== Dante SOCKS5 Proxy Setup ==="
+# ----------------------------
+# 🔐 在此处设置你的用户名和密码
+# ----------------------------
+SOCKS_USER="Dcodkwe54h2"
+SOCKS_PASS="djoJ52wsex6"
 
-# === 用户输入 ===
-read -p "请输入 SOCKS 用户名 (例如: proxyuser): " SOCKS_USER
-read -s -p "请输入该用户的密码: " SOCKS_PASS
-echo
-read -p "请输入允许连接的客户端 IP (例如: 192.168.1.100 或 0.0.0.0 表示不限制): " CLIENT_IP
-CLIENT_IP=${CLIENT_IP:-0.0.0.0}
+PORT=1080
 
-# 自动检测主网络接口（通常为 eth0 或 ens3 等）
-MAIN_IFACE=$(ip route | grep default | awk '{print $5}' | head -n1)
+# 检测主网卡（用于提示，不影响功能）
+MAIN_IFACE=$(ip route show default | awk '{print $5; exit}')
 if [ -z "$MAIN_IFACE" ]; then
     MAIN_IFACE="eth0"
 fi
-echo "检测到主网络接口: $MAIN_IFACE"
 
-# === 1. 更新系统并安装 Dante ===
-echo "正在更新软件包列表..."
-sudo apt update
+echo "=== Dante SOCKS5 Proxy 非交互式安装 ==="
+echo "用户名: $SOCKS_USER"
+echo "密码:   $SOCKS_PASS"
+echo "端口:   $PORT"
+echo "----------------------------------------"
 
-echo "正在安装 dante-server..."
-sudo apt install -y dante-server
+# 更新系统
+apt update -y
 
-# === 2. 创建专用 SOCKS 用户（无登录 shell）===
-echo "正在创建专用用户: $SOCKS_USER"
-sudo useradd -r -s /bin/false "$SOCKS_USER"
-echo "$SOCKS_USER:$SOCKS_PASS" | sudo chpasswd
+# 安装 dante-server
+apt install -y dante-server
 
-# === 3. 备份并生成新的配置文件 ===
-echo "正在配置 /etc/danted.conf..."
-sudo rm -f /etc/danted.conf
+# 创建专用用户（无 home，无 shell）
+if ! id "$SOCKS_USER" &>/dev/null; then
+    useradd -r -s /usr/sbin/nologin "$SOCKS_USER"
+fi
 
-cat <<EOF | sudo tee /etc/danted.conf
+# 设置密码（通过 chpasswd）
+echo "$SOCKS_USER:$SOCKS_PASS" | chpasswd
+
+# 备份原配置
+cp /etc/danted.conf /etc/danted.conf.bak
+
+# 生成新配置
+cat > /etc/danted.conf <<EOF
 logoutput: syslog
 user.privileged: root
-user.unprivileged: nobody
+user.notprivileged: nobody
 
-# 监听所有 IPv4 地址，端口 1080
-internal: 0.0.0.0 port=1080
+# 监听所有 IPv4 地址
+internal: 0.0.0.0 port=$PORT
 
-# 使用主网络接口进行外部连接
-external: $MAIN_IFACE
-
-# 认证方式：用户名密码（SOCKS5）
-socksmethod: username
-
-# 客户端认证：无需认证（但通过规则限制 IP）
-clientmethod: none
-
-# 允许指定 IP 连接
+# 允许客户端来自任意 IP
 client pass {
-    from: $CLIENT_IP/32 to: 0.0.0.0/0
+    from: 0.0.0.0/0 to: 0.0.0.0/0
+    log: connect disconnect error
 }
 
-# 允许所有目标地址通过代理
+# 允许 SOCKS5 认证用户访问任意目标
 socks pass {
     from: 0.0.0.0/0 to: 0.0.0.0/0
+    command: bind connect udpassociate
+    log: connect disconnect error
+}
+
+# 强制使用用户名/密码认证
+socks pass {
+    from: 0.0.0.0/0 to: 0.0.0.0/0
+    command: bindreply udpreply
+    log: connect error
 }
 EOF
 
-# 如果用户输入的是 0.0.0.0，则放宽 CIDR
-if [ "$CLIENT_IP" = "0.0.0.0" ]; then
-    sed -i 's|from: 0.0.0.0/32|from: 0.0.0.0/0|' /etc/danted.conf
+# 启动并启用服务
+systemctl enable --now danted
+
+# 开放防火墙（如果 UFW 启用）
+if command -v ufw &>/dev/null; then
+    ufw allow $PORT/tcp comment 'Dante SOCKS5'
+    ufw reload &>/dev/null || true
 fi
 
-# === 4. 配置防火墙（如果启用 ufw）===
-if command -v ufw >/dev/null 2>&1; then
-    echo "检测到 ufw，正在开放端口 1080..."
-    sudo ufw allow 1080/tcp comment "Dante SOCKS5 Proxy"
+# 获取本机局域网 IP（用于展示）
+LOCAL_IP=$(ip -4 addr show "$MAIN_IFACE" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1)
+if [ -z "$LOCAL_IP" ]; then
+    LOCAL_IP="your_vm_ip"
 fi
 
-# === 5. 启动并启用服务 ===
-echo "正在重启 danted 服务..."
-sudo systemctl restart danted
-sudo systemctl enable danted
+# 获取公网出口 IP（可选）
+PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || echo "failed")
 
-# === 6. 检查状态 ===
-echo "检查服务状态..."
-if systemctl is-active --quiet danted; then
-    echo "✅ Dante SOCKS5 代理已成功启动！"
-    echo
-    echo "使用方法（本地测试）："
-    echo "curl -v -x socks5://$SOCKS_USER:$SOCKS_PASS@$(hostname -I | awk '{print $1}'):1080 http://httpbin.org/ip"
-    echo
-    echo "你的代理地址：socks5://$SOCKS_USER:$SOCKS_PASS@$(curl -s ifconfig.me 2>/dev/null || hostname -I | awk '{print $1}'):1080"
-else
-    echo "❌ Dante 服务启动失败，请检查日志："
-    sudo journalctl -u danted --no-pager -n 20
-    exit 1
-fi
+echo ""
+echo "✅ Dante SOCKS5 代理安装成功！"
+echo "----------------------------------------"
+echo "本地连接地址: socks5://$SOCKS_USER:$SOCKS_PASS@$LOCAL_IP:$PORT"
+echo "公网出口 IP : $PUBLIC_IP"
+echo ""
+echo "💡 提示:"
+echo "1. 若从外部连接，请放行防火墙和路由器端口"
+echo "2. 建议修改默认密码以增强安全性"
+echo "----------------------------------------"
