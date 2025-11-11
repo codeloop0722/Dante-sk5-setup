@@ -71,31 +71,18 @@ internal: 0.0.0.0 port = $SOCKS_PORT
 # 出口网卡（必须指定！）
 external: $MAIN_IFACE
 
-# 允许任意客户端连接
+# socks-rules determine what is proxied through the external interface.
+socksmethod: username
+
+# client-rules determine who can connect to the internal interface.
+clientmethod: none
+
 client pass {
     from: 0.0.0.0/0 to: 0.0.0.0/0
-    log: connect disconnect error
 }
 
-# 启用用户名/密码认证（SOCKS5）
-socks auth {
-    from: 0.0.0.0/0 to: 0.0.0.0/0
-    method: username
-    log: connect disconnect error
-}
-
-# 允许认证用户访问任意目标（TCP）
 socks pass {
     from: 0.0.0.0/0 to: 0.0.0.0/0
-    command: bind connect udpassociate
-    log: connect disconnect error
-}
-
-# 允许返回流量（UDP/TCP 回包）
-socks pass {
-    from: 0.0.0.0/0 to: 0.0.0.0/0
-    command: bindreply udpreply
-    log: connect error
 }
 EOF
 
