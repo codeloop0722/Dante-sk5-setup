@@ -54,9 +54,9 @@ echo "🔑 步骤 3: 生成 REALITY 密钥和 UUID..."
 KEY_OUT=$(xray x25519 2>&1)
 
 # 调试：取消注释可查看原始内容
-# echo "DEBUG: Raw output ->"
-# echo "$KEY_OUT"
-# echo "<- End raw output"
+ echo "DEBUG: Raw output ->"
+ echo "$KEY_OUT"
+ echo "<- End raw output"
 
 # 方法：按行读取，精确匹配开头
 PRIVATE_KEY=""
