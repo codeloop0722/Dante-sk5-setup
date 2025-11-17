@@ -97,7 +97,7 @@ mkdir -p /usr/local/etc/xray
 cat > /usr/local/etc/xray/config.json <<EOF
 {
   "inbounds": [{
-    "port": 443,
+    "port": 12689,
     "protocol": "vless",
     "settings": {
       "clients": [{"id": "$UUID", "flow": "xtls-rprx-vision"}],
@@ -162,11 +162,11 @@ fi
 echo "🛡️ 步骤 6: 开放系统防火墙 (ufw)..."
 
 if command -v ufw &>/dev/null; then
-    ufw allow 443/tcp &>/dev/null || true
+    ufw allow 12689/tcp &>/dev/null || true
     ufw reload &>/dev/null || true
-    echo "✅ ufw 已放行 443/tcp"
+    echo "✅ ufw 已放行 12689/tcp"
 else
-    echo "ℹ️ ufw 未安装，跳过（请确保安全组已开 443）"
+    echo "ℹ️ ufw 未安装，跳过（请确保安全组已开 12689）"
 fi
 
 # =============== 第七步：生成 vless:// 链接 ===============
@@ -186,7 +186,7 @@ echo "$VLESS_LINK"
 echo ""
 echo "📝 手动参数："
 echo "地址: $PUBLIC_IP"
-echo "端口: 443"
+echo "端口: 12689"
 echo "UUID: $UUID"
 echo "Public Key: $PUBLIC_KEY"
 echo "SNI: www.baidu.com"
