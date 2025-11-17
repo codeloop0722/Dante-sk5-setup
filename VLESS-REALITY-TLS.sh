@@ -37,7 +37,7 @@ mkdir -p /tmp/xray-install
 cd /tmp/xray-install
 
 # 尝试从 jsDelivr 下载安装脚本（国内可访问）
-if curl -fsSL -o install.sh https://cdn.jsdelivr.net/gh/XTLS/Xray-install@main/install-release.sh; then
+if curl -fsSL https://github.com/XTLS/Xray-core/releases/download/v24.1.0/install.sh -o install.sh; then
     echo "✅ 成功从 jsDelivr 获取安装脚本"
 elif curl -fsSL -o install.sh https://ghproxy.com/https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh; then
     echo "✅ 成功从 ghproxy 获取安装脚本"
