@@ -34,45 +34,54 @@ fi
 echo "✅ Xray 安装成功：$(xray version | head -n1)"
 
 # =============== 第二步：获取公网 IP ===============
+
+echo "🌐 步骤 2: 获取服务器公网 IP..."
+
+PUBLIC_IP=$(curl -s --max-time 5 https://api.ipify.org || \
+           curl -s --max-time 5 https://ipv4.icanhazip.com || \
+           echo "150.223.194.15")  # 默认回退
+
+if [[ "$PUBLIC_IP" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "✅ 公网 IP: $PUBLIC_IP"
+else
+    read -p "⚠️ 无法自动获取 IP，请手动输入: " PUBLIC_IP
+fi
+# =============== 第三步：生成uuid ===============
+# 提取 PrivateKey 和 Password（新版 Xray 使用 Password 作为 Public Key！）
 echo "🔑 步骤 3: 生成 REALITY 密钥和 UUID..."
 
-# 强制英文环境
-export LANG=C.UTF-8
-export LC_ALL=C
-
-# 生成密钥（显示原始输出便于调试）
+# 获取原始输出（确保捕获所有）
 KEY_OUT=$(xray x25519 2>&1)
-echo "原始输出:"
-echo "$KEY_OUT"
-echo "------------------"
 
-# 提取 PrivateKey 和 Password（新版 Xray 使用 Password 作为 Public Key！）
-PRIVATE_KEY=$(echo "$KEY_OUT" | grep -E '^[Pp]rivate[Kk]ey' | awk '{print $2}' | tr -d '\r\n')
-PUBLIC_KEY=$(echo "$KEY_OUT" | grep -E '^[Pp]assword'     | awk '{print $2}' | tr -d '\r\n')
+# 调试：取消注释可查看原始内容
+# echo "DEBUG: Raw output ->"
+# echo "$KEY_OUT"
+# echo "<- End raw output"
+
+# 方法：按行读取，精确匹配开头
+PRIVATE_KEY=""
+PUBLIC_KEY=""
+
+while IFS= read -r line; do
+    if [[ "$line" == PrivateKey:* ]]; then
+        PRIVATE_KEY="${line#PrivateKey: }"
+    elif [[ "$line" == Password:* ]]; then
+        PUBLIC_KEY="${line#Password: }"
+    fi
+done <<< "$KEY_OUT"
+
+# 去除尾部换行/空格
+PRIVATE_KEY=$(echo "$PRIVATE_KEY" | tr -d '\r\n ')
+PUBLIC_KEY=$(echo "$PUBLIC_KEY" | tr -d '\r\n ')
 
 UUID=$(cat /proc/sys/kernel/random/uuid)
 
 # 验证
 if [ -z "$PRIVATE_KEY" ] || [ -z "$PUBLIC_KEY" ]; then
-    echo "❌ 无法提取 PrivateKey 或 Password（Public Key）！"
-    echo "请确保使用 Xray 25.10.15+，且输出包含 PrivateKey 和 Password"
-    exit 1
-fi
-
-echo "✅ UUID: $UUID"
-echo "✅ Private Key (服务端用): ${PRIVATE_KEY:0:8}..."
-echo "✅ Public Key (客户端用): ${PUBLIC_KEY:0:8}..."
-
-# =============== 第三步：生成 REALITY 参数 ===============
-echo "🔑 步骤 3: 生成 REALITY 密钥和 UUID..."
-
-KEY_OUT=$(xray x25519 2>/dev/null)
-PRIVATE_KEY=$(echo "$KEY_OUT" | grep "Private key" | cut -d: -f2 | tr -d ' ')
-PUBLIC_KEY=$(echo "$KEY_OUT" | grep "Public key"  | cut -d: -f2 | tr -d ' ')
-UUID=$(cat /proc/sys/kernel/random/uuid)
-
-if [ -z "$PRIVATE_KEY" ] || [ -z "$PUBLIC_KEY" ]; then
-    echo "❌ 密钥生成失败！"
+    echo "❌ 提取失败！请检查以下输出是否包含 'PrivateKey:' 和 'Password:'："
+    echo "----------------------------------------"
+    echo "$KEY_OUT"
+    echo "----------------------------------------"
     exit 1
 fi
 
