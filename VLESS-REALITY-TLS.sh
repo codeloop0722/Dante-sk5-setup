@@ -28,31 +28,6 @@ fi
 
 echo "🌐 检测到服务器 IP: $PUBLIC_IP"
 
-# ========================
-# 第一步：安装 Xray（使用国内镜像）
-# ========================
-echo "⏳ 正在安装 Xray（使用 jsDelivr 镜像）..."
-
-mkdir -p /tmp/xray-install
-cd /tmp/xray-install
-
-# 尝试从 jsDelivr 下载安装脚本（国内可访问）
-if curl -fsSL https://github.com/XTLS/Xray-core/releases/download/v24.1.0/install.sh -o install.sh; then
-    echo "✅ 成功从 jsDelivr 获取安装脚本"
-elif curl -fsSL -o install.sh https://ghproxy.com/https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh; then
-    echo "✅ 成功从 ghproxy 获取安装脚本"
-else
-    echo "❌ 无法下载安装脚本，请检查网络或手动安装 Xray"
-    exit 1
-fi
-
-chmod +x install.sh
-bash install.sh @ install
-
-if ! command -v xray &> /dev/null; then
-    echo "❌ Xray 安装失败，请手动上传二进制文件"
-    exit 1
-fi
 
 echo "✅ Xray 安装成功，版本：$(xray version | head -n1)"
 
